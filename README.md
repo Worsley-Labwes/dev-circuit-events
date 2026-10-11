@@ -1,6 +1,6 @@
 # DevCircuit
 
-DevCircuit helps developers discover tech events, workshops, and hackathons across Kenya. The preview includes event search and filters, saved events, collaboration profiles, and an organizer studio. Preview-created events and saved items persist in the current browser.
+DevCircuit helps developers discover tech events, workshops, and hackathons across Kenya. The preview includes event search and filters, saved events, collaboration profiles, and an organizer studio. Preview-created events, saved items, and your editable builder profile persist in the current browser.
 
 ## Run locally
 
@@ -15,4 +15,4 @@ npm run dev
 2. Copy `.env.example` to `.env.local` and add your project URL and anon key.
 3. Add event rows in the Supabase table and set `published` to `true` to show them in DevCircuit.
 
-The anon key is intended for browser use. Row-level security is enabled, and only published events are readable by visitors. Event publishing and collaboration profiles currently run as local browser previews; add organizer authentication before allowing public database writes.
+The anon key is intended for browser use. Row-level security is enabled, and only published events are readable by visitors. Event publishing and collaboration profiles currently run as local browser previews; profiles are not shared accounts. Add authentication and profile policies before allowing public database writes or cross-device profile sharing.

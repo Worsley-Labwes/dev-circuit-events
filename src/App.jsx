@@ -203,7 +203,13 @@ function App() {
   const [savedIds, setSavedIds] = useState(() => readStored('devcircuit-saved', []))
   const [connectedPeople, setConnectedPeople] = useState(() => readStored('devcircuit-connections', []))
   const [events, setEvents] = useState(() => readStored('devcircuit-events', initialEvents))
+  const [myProfile, setMyProfile] = useState(() => readStored('devcircuit-profile', null))
   const [showCreate, setShowCreate] = useState(false)
+  const [showProfileEditor, setShowProfileEditor] = useState(false)
+  const [showTeamFilters, setShowTeamFilters] = useState(false)
+  const [teamLocation, setTeamLocation] = useState('Everywhere')
+  const [teamRole, setTeamRole] = useState('All roles')
+  const [teamQuery, setTeamQuery] = useState('')
   const [notice, setNotice] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -238,6 +244,7 @@ function App() {
   useEffect(() => localStorage.setItem('devcircuit-saved', JSON.stringify(savedIds)), [savedIds])
   useEffect(() => localStorage.setItem('devcircuit-connections', JSON.stringify(connectedPeople)), [connectedPeople])
   useEffect(() => localStorage.setItem('devcircuit-events', JSON.stringify(events)), [events])
+  useEffect(() => localStorage.setItem('devcircuit-profile', JSON.stringify(myProfile)), [myProfile])
 
   const filteredEvents = useMemo(() => events.filter((event) => {
     const matchesView = view !== 'Saved' || savedIds.includes(event.id)
@@ -249,6 +256,16 @@ function App() {
   }), [category, events, location, query, savedIds, selectedDate, view])
   const eventDates = useMemo(() => events.map((event) => toLocalDate(event.date)), [events])
   const cityCount = new Set(events.map((event) => event.city).filter((city) => city !== 'Online')).size
+  const teamPeople = useMemo(() => myProfile
+    ? [...people.filter((person) => person.id !== 'local-profile'), myProfile]
+    : people, [myProfile])
+  const teamRoles = useMemo(() => [...new Set(teamPeople.map((person) => person.role))].sort(), [teamPeople])
+  const filteredPeople = useMemo(() => teamPeople.filter((person) => {
+    const matchesCity = teamLocation === 'Everywhere' || person.city === teamLocation
+    const matchesRole = teamRole === 'All roles' || person.role === teamRole
+    const searchText = `${person.name} ${person.role} ${person.city} ${person.lookingFor}`.toLowerCase()
+    return matchesCity && matchesRole && searchText.includes(teamQuery.toLowerCase())
+  }), [teamLocation, teamPeople, teamQuery, teamRole])
 
   function toggleSaved(eventId) {
     setSavedIds((current) => current.includes(eventId)
@@ -286,6 +303,23 @@ function App() {
     window.setTimeout(() => setNotice(''), 3500)
   }
 
+  function saveProfile(formData) {
+    const name = formData.get('name').trim()
+    const initials = name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
+    setMyProfile({
+      id: 'local-profile',
+      name,
+      initials,
+      role: formData.get('role').trim(),
+      city: formData.get('city'),
+      lookingFor: formData.get('lookingFor').trim(),
+      color: 'mint',
+    })
+    setShowProfileEditor(false)
+    setNotice('Your profile is saved in this browser and listed in Find a team.')
+    window.setTimeout(() => setNotice(''), 4000)
+  }
+
   function chooseView(nextView) {
     setView(nextView)
     setMobileMenuOpen(false)
@@ -310,7 +344,7 @@ function App() {
         <div className="topbar-center"><span className="live-dot" /> Kenya&apos;s builder calendar</div>
         <div className="topbar-actions">
           <button className="organizer-link" type="button" onClick={() => chooseView('Organizer studio')}>For organizers <ArrowUpRight size={15} /></button>
-          <button className="avatar-button" type="button" aria-label="Open profile menu" onClick={() => setNotice('Profile sign-in is coming soon.')}>M</button>
+          <button className="avatar-button" type="button" aria-label={myProfile ? 'Edit your profile' : 'Create your profile'} onClick={() => setShowProfileEditor(true)}>{myProfile?.initials || 'M'}</button>
           <button className="mobile-menu-button icon-button" type="button" aria-label="Toggle navigation" onClick={() => setMobileMenuOpen((open) => !open)}>
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -406,9 +440,16 @@ function App() {
               <div className="eyebrow"><span className="eyebrow-line" /> GOOD PEOPLE, GOOD WORK</div>
               <h1 className="subpage-title">Build your<br /><span>people.</span></h1>
               <p className="subpage-copy">Meet makers looking for a teammate, a fresh perspective, or a reason to start.</p>
-              <div className="team-callout"><Sparkles size={18} /><span>Showing builders open to collaborating</span><button type="button" onClick={() => setNotice('More profile filters are coming soon.')}>Filters <ChevronDown size={14} /></button></div>
-              <div className="people-grid">{people.map((person) => <PersonCard key={person.name} person={person} connected={connectedPeople.includes(person.name)} onConnect={() => toggleConnection(person.name)} />)}</div>
-              <div className="profile-note"><span className="note-asterisk">✳</span><p>Your people are out there. <button type="button" onClick={() => setNotice('Profile creation is coming soon.')}>Create your profile <ArrowRight size={14} /></button></p></div>
+              <div className="team-callout"><Sparkles size={18} /><span>{filteredPeople.length} {filteredPeople.length === 1 ? 'builder' : 'builders'} open to collaborating</span><button type="button" aria-expanded={showTeamFilters} onClick={() => setShowTeamFilters((open) => !open)}>Filters <ChevronDown size={14} /></button></div>
+              {showTeamFilters && <div className="team-filters-panel">
+                <label className="team-search"><Search size={15} /><input value={teamQuery} onChange={(event) => setTeamQuery(event.target.value)} placeholder="Name, skill, or project" aria-label="Search people" /></label>
+                <label className="team-filter-field">CITY<select value={teamLocation} onChange={(event) => setTeamLocation(event.target.value)}>{locations.map((place) => <option key={place}>{place}</option>)}</select></label>
+                <label className="team-filter-field">ROLE<select value={teamRole} onChange={(event) => setTeamRole(event.target.value)}><option>All roles</option>{teamRoles.map((role) => <option key={role}>{role}</option>)}</select></label>
+                <button className="clear-team-filters" type="button" onClick={() => { setTeamLocation('Everywhere'); setTeamRole('All roles'); setTeamQuery('') }}>Clear filters</button>
+              </div>}
+              <div className="people-grid">{filteredPeople.map((person) => <PersonCard key={person.id || person.name} person={person} isOwn={person.id === 'local-profile'} connected={connectedPeople.includes(person.name)} onConnect={() => toggleConnection(person.name)} onEdit={() => setShowProfileEditor(true)} />)}</div>
+              {filteredPeople.length === 0 && <div className="empty-state"><span className="empty-icon"><Users size={22} /></span><h3>No builders match those filters.</h3><p>Try a different city, role, or search.</p><button type="button" onClick={() => { setTeamLocation('Everywhere'); setTeamRole('All roles'); setTeamQuery('') }}>Clear filters <ArrowRight size={15} /></button></div>}
+              <div className="profile-note"><span className="note-asterisk">✳</span><p>Your people are out there. <button type="button" onClick={() => setShowProfileEditor(true)}>{myProfile ? 'Edit your profile' : 'Create your profile'} <ArrowRight size={14} /></button></p></div>
             </section>
           )}
 
@@ -428,6 +469,7 @@ function App() {
 
       {notice && <div className="toast" role="status"><Check size={17} />{notice}<button type="button" aria-label="Dismiss notification" onClick={() => setNotice('')}><X size={15} /></button></div>}
       {showCreate && <CreateEventModal onClose={() => setShowCreate(false)} onSubmit={createEvent} />}
+      {showProfileEditor && <ProfileModal profile={myProfile} onClose={() => setShowProfileEditor(false)} onSubmit={saveProfile} />}
     </div>
   )
 }
@@ -463,14 +505,14 @@ function EventFilters({ category, setCategory, query, setQuery, location, setLoc
   )
 }
 
-function PersonCard({ person, connected, onConnect }) {
+function PersonCard({ person, connected, isOwn, onConnect, onEdit }) {
   return (
     <article className="person-card">
       <div className={`person-avatar person-${person.color}`}>{person.initials}<span className="person-online" /></div>
       <div className="person-heading"><div><h3>{person.name}</h3><span>{person.role}</span></div><span className="person-city"><MapPin size={13} />{person.city}</span></div>
       <div className="looking-for-label">LOOKING TO</div>
       <p>{person.lookingFor}</p>
-      <button type="button" className={`connect-button ${connected ? 'connected' : ''}`} onClick={onConnect}>{connected ? <><Check size={15} /> Request sent</> : <><Send size={14} /> Say hello</>}</button>
+      <button type="button" className={`connect-button ${connected || isOwn ? 'connected' : ''}`} onClick={isOwn ? onEdit : onConnect}>{isOwn ? <><Sparkles size={14} /> Edit your profile</> : connected ? <><Check size={15} /> Request sent</> : <><Send size={14} /> Say hello</>}</button>
     </article>
   )
 }
@@ -512,6 +554,29 @@ function CreateEventModal({ onClose, onSubmit }) {
           <label className="form-field form-wide">Registration link<input name="registrationUrl" type="url" placeholder="https://" /></label>
           <label className="form-field form-wide">Organizer name<input name="organizer" placeholder="Your community or organization" /></label>
           <div className="modal-actions"><button type="button" className="cancel-button" onClick={onClose}>Cancel</button><button type="submit" className="primary-button"><Plus size={16} /> Publish event</button></div>
+        </form>
+      </section>
+    </div>
+  )
+}
+
+function ProfileModal({ profile, onClose, onSubmit }) {
+  function handleSubmit(event) {
+    event.preventDefault()
+    onSubmit(new FormData(event.currentTarget))
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+      <section className="create-modal profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+        <div className="modal-heading"><div><span className="section-kicker">MEET YOUR NEXT TEAMMATE</span><h2 id="profile-title">{profile ? 'Edit your profile' : 'Create your profile'}</h2></div><button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><X size={20} /></button></div>
+        <form onSubmit={handleSubmit}>
+          <label className="form-field form-wide">Your name<input name="name" defaultValue={profile?.name || ''} placeholder="e.g. Wanjiku Mwangi" required maxLength="60" /></label>
+          <label className="form-field form-wide">What do you do?<input name="role" defaultValue={profile?.role || ''} placeholder="e.g. Frontend developer" required maxLength="60" /></label>
+          <label className="form-field form-wide">City<select name="city" defaultValue={profile?.city || 'Nairobi'}><option>Nairobi</option><option>Mombasa</option><option>Kisumu</option><option>Online</option></select></label>
+          <label className="form-field form-wide">What are you looking to build?<textarea name="lookingFor" defaultValue={profile?.lookingFor || ''} rows="3" placeholder="Share the kind of teammate or project you have in mind" required maxLength="140" /></label>
+          <p className="profile-storage-note">This preview saves your profile only in this browser. It is not an account and is not shared with other visitors.</p>
+          <div className="modal-actions"><button type="button" className="cancel-button" onClick={onClose}>Cancel</button><button type="submit" className="primary-button"><Check size={16} /> Save profile</button></div>
         </form>
       </section>
     </div>
