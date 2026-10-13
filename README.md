@@ -1,6 +1,6 @@
 # DevCircuit
 
-DevCircuit helps developers discover tech events, workshops, and hackathons across Kenya. The preview includes event search and filters, saved events, collaboration profiles, and an organizer studio. Preview-created events, saved items, and your editable builder profile persist in the current browser.
+DevCircuit helps developers discover tech events, workshops, and hackathons across Kenya. The preview includes event search and filters, saved events, collaboration profiles, and an organizer studio. Preview-created events, saved items, and your editable builder profile persist in the current browser. Demo events live in `src/data.js`; once Supabase returns published events they replace the demo events.
 
 ## Run locally
 
